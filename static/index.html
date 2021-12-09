@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class='files'>
-        <div v-for='file in files' :key='file.name' class='file' @dblclick='openOrDownload(file)'>
+        <div v-for='file in files' :key='file.name' class='file' @click='openOrDownload(file)'>
           <button class='delete' @click='deletePath(file)'></button>
           <i v-if='file.file' class="fas fa-file fa-3x"></i>
           <i v-else class="fas fa-folder fa-3x"></i>
