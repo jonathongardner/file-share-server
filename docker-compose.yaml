@@ -1,0 +1,14 @@
+version: "3"
+volumes:
+  fileserver-data: {}
+services:
+  file-server:
+    image: file-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+      - fileserver-data:/app/tmp
