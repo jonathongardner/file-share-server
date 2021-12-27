@@ -23,19 +23,23 @@ const renderError = (res, message, code = 200) => {
 }
 
 const checkPath = (fullPath, { file = true, folder = true }) => {
+  const name = path.basename(fullPath)
+  if (name.startsWith('.')) {
+    throw { message: 'Cannot view/save hidden files', statusCode: 400 }
+  }
   if (!file && !folder) {
     if (fs.existsSync(fullPath)) {
       throw { message: 'Path already exists', statusCode: 422 }
     }
-    return { file: false, directory: false, fullPath: fullPath }
+    return { file: false, directory: false, fullPath: fullPath, name: name }
   }
 
   const sync = fs.lstatSync(fullPath)
   if (file && sync.isFile()) {
-    return { file: true, directory: false, fullPath: fullPath }
+    return { file: true, directory: false, fullPath: fullPath, name: name }
   }
   if (folder && sync.isDirectory()) {
-    return { file: false, directory: true, fullPath: fullPath }
+    return { file: false, directory: true, fullPath: fullPath, name: name }
   }
   throw { message: 'Path not found', statusCode: 404 }
 }
@@ -69,7 +73,7 @@ app.get(apiRoute, errorHandler((req, res, { file, fullPath }) => {
   } else {
     console.log('Listing folder ' + fullPath)
     renderJson(res, {
-      data: fs.readdirSync(fullPath, { withFileTypes: true }).map(v => {
+      data: fs.readdirSync(fullPath, { withFileTypes: true }).filter(v => !v.name.startsWith('.')).map(v => {
         // const file = path.join(fullPath, v.name)
         // const stats = fs.statSync(file)
         return { name: v.name, file: v.isFile(), directory: v.isDirectory() }

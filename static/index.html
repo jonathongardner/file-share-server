@@ -8,7 +8,7 @@
   </head>
   <body>
     <div id='app'>
-      <div class='nav has-text-white'>
+      <div class='nav'>
         <a id='upButton' v-if='canGoUp' @click='up'>
           <i class="fas fa-arrow-up"></i>
         </a>
@@ -17,12 +17,32 @@
         </div>
       </div>
       <div class='files'>
-        <div v-for='file in files' :key='file.name' class='file' @click='openOrDownload(file)'>
-          <button class='delete' @click='deletePath(file)'></button>
-          <i v-if='file.file' class="fas fa-file fa-3x"></i>
-          <i v-else class="fas fa-folder fa-3x"></i>
-          <div>{{ file.name }}</div>
-        </div>
+        <table class="table is-fullwidth">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Options</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for='file in files' :key='file.name'>
+              <template v-if='file.file'>
+                <th><i class="fas fa-file fa-2x"></i></th>
+                <td><a :href="downloadPath(file)" :download='file.name'>{{ file.name }}</a>
+              </template>
+              <template v-else>
+                <th><i class="fas fa-folder fa-2x"></i></th>
+                <td><a :href="file.name">{{ file.name }}</a>
+              </template>
+              <td>
+                <button class="button is-danger is-outlined" @click='deletePath(file)'>
+                  <span class="icon"><i class="fa fa-trash"></i></span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div class='manage'>
         <div>
@@ -58,6 +78,9 @@
         }
       },
       methods: {
+        downloadPath (file) {
+          return ['api', 'files', ...this.paths, file.name].join('/')
+        },
         up () {
           if (this.canGoUp) {
             const paths = [...this.paths]
@@ -134,7 +157,7 @@
       height: 100vh;
     }
     body {
-      background-color: #2c3e50;
+      /* background-color: #2c3e50; */
       height: 100vh;
       margin: 0px;
     }
@@ -147,34 +170,6 @@
     .nav {
       display: flex;
       justify-content: center;
-    }
-    .files {
-      margin: 20px;
-      border: 5px solid white;
-      padding: 10px;
-      border-radius: 25px;
-      display: flex;
-      flex-wrap: wrap;
-      flex: 1;
-    }
-    .file {
-      margin: 5px;
-      border: 2px solid white;
-      padding: 5px;
-      border-radius: 10px;
-      width: 75px;
-      height: 100px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-around;
-      align-items: center;
-      background-color: white;
-    }
-    .delete {
-      position: absolute;
-      right: 0px;
-      top: 0px;
-      transform: translate(40%, -40%);
     }
     .manage {
       position: absolute;
