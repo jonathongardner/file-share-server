@@ -1,0 +1,212 @@
+<html>
+  <head>
+    <title>File Server</title>
+    <link rel="shortcut icon" type="image/jpg" href="static/favicon.png"/>
+    <script src="https://unpkg.com/vue@next"></script>
+    <script src="peer-connection.js"></script>
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css" integrity="sha384-AYmEC3Yw5cVb3ZcuHtOA93w35dYTsvhLPVnYs9eStHfGJvOvKxVfELGroGkvsg+p" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma-rtl.min.css">
+  </head>
+  <body>
+    <div id='app'>
+      <!-- Clients -->
+      <h1 class="title is-3">Clients</h1>
+      <div class="card" v-for="pClient in pClients" :key='pClient.identifier' @click=''>
+        <div class="card-content">
+          <div class="media">
+            <div class="media-content">
+              <p class="title is-5">{{ pClient.name }}</p>
+              <p class="subtitle is-6">({{ pClient.ipAddress }})</p>
+            </div>
+          </div>
+          <div v-if='pClient.error' class="content">
+            Error try again.
+          </div>
+          <div v-else-if='pClient.connected' class="content">
+            <div class="file is-large is-boxed">
+              <label class="file-label">
+                <input class="file-input" type="file" ref='file' @change='addFiles'>
+                <span class="file-cta">
+                  <span class="file-icon">
+                    <i class="fas fa-upload"></i>
+                  </span>
+                  <span class="file-label">
+                    Files to send
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <template v-if='pClient.connectionRequest'>
+            <a class="card-footer-item" @click='acceptConnection(pClient)'>Accept</a>
+            <a class="card-footer-item" @click='declineConnection(pClient)'>Decline</a>
+          </template>
+          <a v-else-if='pClient.error || pClient.connected' class="card-footer-item" @click='disconnect(pClient)'>Disconnect</a>
+          <span v-else-if='pClient.connecting'  class="card-footer-item">Connecting...</span>
+          <a v-else class="card-footer-item" @click='connect(pClient)'>Connect</a>
+        </footer>
+      </div>
+    </div>
+    <!-- Clients -->
+  </body>
+  <script>
+    Vue.createApp({
+      data () {
+        const socket = new WebSocket(`ws://${location.host}/candidates`);
+        // socket.onopen = this.socketOpen
+        socket.onmessage = this.socketMessge
+
+        return {
+          socket,
+          clients: [],
+          peers: {}
+        }
+      },
+      computed: {
+        pClients () {
+          return this.clients.map(c => {
+            const peer = this.peers[c.identifier] || {}
+            return {
+              ...c,
+              connectionRequest: !!peer.connectionRequest,
+              connecting: !peer.connected && !!peer.pc,
+              connected: !!peer.connected
+            }
+          })
+        }
+      },
+      methods: {
+        //-----Socket-----
+        // socketOpen (message) {
+        //   console.log("Socket opened")
+        // },
+        socketMessge (message) {
+          const { type, data } = JSON.parse(message.data)
+          switch (type) {
+            case 'ListClients':
+              const newPeers = data.reduce((acc, c) => {
+                if (c.identifier in this.peers) {
+                  acc[c.identifier] = this.peer[c.identifier]
+                }
+                return acc
+              }, {})
+              this.clients = data
+              this.peers = newPeers
+              break;
+            case 'SDP':
+              const { client: { identifier }, description } = data
+              // if pc isnt in peers than its b/c its already waitng on response
+              if (identifier in this.peers) {
+                // can have peer but not pc if user declined to connect
+                if ('pc' in this.peers[identifier]) {
+                  const { pc } = this.peers[identifier]
+                  pc.setRemoteDescription(description)
+                }
+              } else {
+                this.peers[identifier] = { connectionRequest: description }
+              }
+              break;
+          }
+        },
+        //-----Socket-----
+        newPC(identifier) {
+          const pc = new PeerConnection(identifier)
+          pc.descriptionCallback = this.sendDescription
+          pc.fileCallback = this.downloadFile
+          pc.stateCallback = this.pcStateChanged
+          return pc
+        },
+        //-----PC-----
+        connect ({ identifier }) {
+          if (identifier in this.peers) {
+            return // dont allow conneting to multiple
+          }
+
+          const pc = this.newPC(identifier)
+          this.peers[identifier] = { pc }
+
+          pc.createLocalDescription()
+        },
+        disconnect ({ identifier }) {
+          if (identifier in this.peers) {
+            const { pc } = this.peers[identifier]
+            delete this.peers[identifier]
+            pc.stop()
+          }
+        },
+        sendDataMessage ({ identifier }) {
+          const { pc } = this.peers[identifier] || {}
+          if (!pc) {
+            return
+          }
+          console.log('Sending file')
+          pc.fileC.send(JSON.stringify({ hello: 'world' }))
+        },
+        //-----PC-----
+        //-----PC callbacks-----
+        sendDescription (identifier, description) {
+          this.sendMessage('SDP', { identifier, description })
+        },
+        downloadFile(identifier, jsonFile) {
+          console.log(jsonFile)
+        },
+        pcStateChanged (identifier, state) {
+          console.log(`PC State: ${identifier} - ${state}`)
+          if (identifier in this.peers) {
+            switch(state) {
+              case "new":
+              case "checking":
+              case "connecting":
+                break;
+              case "connected":
+                this.peers[identifier].connected = true
+                break;
+              case "disconnected":
+              case "closed":
+                this.disconnect({ identifier })
+                break;
+              case "failed":
+                this.peers[identifier].error = true
+                break
+            }
+          }
+        },
+        //-----PC callbacks-----
+        //-----Connected Request-----
+        acceptConnection ({ identifier }) {
+          const pc = this.newPC(identifier)
+          const { connectionRequest } = this.peers[identifier]
+          this.peers[identifier] = { pc }
+          pc.setRemoteDescription(connectionRequest)
+        },
+        declineConnection ({ identifier }) {
+          // dont delete identifier for peer so if the user keeps requesting
+          delete this.peers[identifier].connectionRequest
+        },
+        //-----Connected Request-----
+        sendMessage(type, data) {
+          this.socket.send(JSON.stringify({ type, data }))
+        }
+      },
+      created () {}
+    }).mount('#app')
+  </script>
+  <style>
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      align-items: center;
+    }
+    #app > * {
+      max-width: 600px;
+    }
+    body {
+      /* background-color: #2c3e50; */
+      height: 100vh;
+      margin: 0px;
+    }
+  </style>
+</html>

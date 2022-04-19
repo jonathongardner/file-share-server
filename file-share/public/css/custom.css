@@ -1,0 +1,23 @@
+.seperated-flex {
+  display: flex;
+  flex-direction: column;
+}
+.seperated-flex > div {
+  border-bottom: 1px solid #eee;
+  font-size: 2rem;
+  padding: 0px 5px;
+  margin: 0px;
+}
+.card {
+  min-width: 300px;
+}
+.card > .header > .title {
+  font-size: 3.6rem;
+  margin: 0px;
+  line-height: 1em;
+}
+.card > .header > .subtitle {
+  font-size: 2rem;
+  color: #808080;
+  margin: 0px;
+}
